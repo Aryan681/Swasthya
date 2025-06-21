@@ -82,14 +82,10 @@ const TriagePage = ({ syncedResults = [] }) => {
 
   useEffect(() => {
     const handleStatusChange = (isOnline) => {
-      if (isOnline) {
-        setShowOfflineSaved(false);
-      }
+      if (isOnline) setShowOfflineSaved(false);
     };
     offlineManager.onStatusChange(handleStatusChange);
-    return () => {
-      // No cleanup needed for now
-    };
+    return () => {};
   }, []);
 
   const handleSubmit = async (e) => {
@@ -288,7 +284,21 @@ const TriagePage = ({ syncedResults = [] }) => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-12 px-4 sm:px-6 lg:px-8">
-   
+      {/* Show synced results if any */}
+      {syncedResults.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-bold text-green-700">Recently Synced Results</h2>
+          {syncedResults.map((res, idx) =>
+            res.data && res.data.triageResult ? (
+              renderTriageResultCard(res.data)
+            ) : (
+              <div key={res.id || idx} className="p-4 my-2 bg-red-50 border border-red-200 rounded">
+                <span>Error: {res.error}</span>
+              </div>
+            )
+          )}
+        </div>
+      )}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -435,11 +445,8 @@ const TriagePage = ({ syncedResults = [] }) => {
         {/* Results Section: Show synced results first, then current result */}
         <div className="mt-8">
           {showOfflineSaved && !offlineManager.isOnline() && (
-            <div className="mb-6">
-              <div className="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
-                <h3 className="text-lg font-medium text-yellow-800">Saved Locally</h3>
-                <p className="text-yellow-700">Saved locally - will sync when online.</p>
-              </div>
+            <div className="mb-4 p-4 bg-yellow-50 border-l-4 border-yellow-400 text-yellow-800 rounded">
+              Saved locally - will sync when online
             </div>
           )}
           {syncedResults.length > 0 && (

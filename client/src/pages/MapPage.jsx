@@ -6,6 +6,20 @@ import { FaPhone, FaDirections, FaAmbulance, FaHospital, FaMapMarkerAlt } from '
 // Extended hospital data with contact info and services
 const hospitals = [
   {
+    id: 101,
+    name: 'Clinique Lumière',
+    type: 'clinic',
+    address: 'Delmas 75, Port-au-Prince',
+    lat: 18.5432,
+    lng: -72.3021,
+    phone: '+509 3821 4567',
+    emergency: null,
+    services: ['General Medicine', 'Pediatrics', 'Vaccinations'],
+    hours: 'Mon-Fri: 7am-5pm, Sat: 8am-1pm',
+    distance: null,
+    rating: 4.2
+  },
+  {
     id: 1,
     name: 'Hôpital Universitaire de Mirebalais',
     address: 'Mirebalais, Haiti',
@@ -82,6 +96,34 @@ const hospitals = [
     ambulance: '+509 2817 7778',
     services: ['Urgent Care', 'Laboratory'],
     distance: null
+  },
+  {
+    id: 201,
+    name: 'Pharmacie Bon Samaritain',
+    type: 'pharmacy',
+    address: 'Rue Capois, Port-au-Prince',
+    lat: 18.5412,
+    lng: -72.3389,
+    phone: '+509 3845 6789',
+    emergency: null,
+    services: ['Prescriptions', 'Over-the-counter'],
+    hours: 'Mon-Sun: 7am-9pm',
+    distance: null,
+    rating: 4.0
+  },
+  {
+    id: 301,
+    name: 'Centre de Traumatologie',
+    type: 'trauma-center',
+    address: 'Tabarre, Port-au-Prince',
+    lat: 18.5798,
+    lng: -72.2665,
+    phone: '+509 3100 1234',
+    emergency: '+509 3100 1235',
+    services: ['Trauma Care', 'Orthopedics', 'Rehabilitation'],
+    hours: '24/7',
+    distance: null,
+    rating: 4.7
   }
 ];
 
