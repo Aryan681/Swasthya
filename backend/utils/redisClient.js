@@ -13,7 +13,7 @@ client.on('error', (err) => {
 async function connectWithRetry(retries = 5, delay = 2000) {
   for (let i = 0; i < retries; i++) {
     try {
-      await client.connect();
+      await client.connect();   
       console.log('✅ Connected to Redis Cloud');
       return client;
     } catch (err) {

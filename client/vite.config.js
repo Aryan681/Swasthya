@@ -4,10 +4,11 @@ import { VitePWA } from 'vite-plugin-pwa'
 import tailwindcss from '@tailwindcss/vite'
 import path from 'path'
 
-// https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
+
   return {
+    base: './', // 👈 important for relative paths on Vercel
     server: {
       proxy: {
         '/api': {
@@ -17,7 +18,8 @@ export default defineConfig(({ mode }) => {
       },
     },
     plugins: [
-      react(),tailwindcss(),
+      react(),
+      tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
         includeAssets: ['favicon.svg', 'favicon.ico', 'robots.txt', 'apple-touch-icon.png'],

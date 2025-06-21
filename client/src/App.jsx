@@ -14,7 +14,8 @@ function App() {
   return (
     <>
       <ConnectionBanner />
-      <SyncButton apiUrl="/api/triage" onResults={setSyncedResults} />
+      <SyncButton apiUrl={`${import.meta.env.VITE_BACKEND_URL}/api/triage`} onResults={setSyncedResults} />
+
       <Navbar />
       <Routes>
         <Route path="/" element={<HomePage />} />
