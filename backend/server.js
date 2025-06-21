@@ -12,7 +12,7 @@ const app = express();
 const port = process.env.PORT || 3001;
 const allowedOrigins = [
   'http://localhost:5173',
-  'https://swasthya-7g67ak1yn-aryans-projects-c3239cad.vercel.app'
+  'https://swasthya-eu1727lyj-aryans-projects-c3239cad.vercel.app'
 ];
 
 app.use(cors({
@@ -24,7 +24,7 @@ app.use(cors({
   },
   credentials: true,
 }));
-
+  
 // Middleware
 
 app.use(express.json());
