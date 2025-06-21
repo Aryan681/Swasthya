@@ -379,21 +379,9 @@ const renderTriageResultCard = (result) => (
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-12 px-4 sm:px-6 lg:px-8">
-      {/* Show synced results if any */}
-      {syncedResults.length > 0 && (
-        <div className="mb-6">
-          <h2 className="text-lg font-bold text-green-700">Recently Synced Results</h2>
-          {syncedResults.map((res, idx) =>
-            res.data && res.data.triageResult ? (
-              renderTriageResultCard(res.data)
-            ) : (
-              <div key={res.id || idx} className="p-4 my-2 bg-red-50 border border-red-200 rounded">
-                <span>Error: {res.error}</span>
-              </div>
-            )
-          )}
-        </div>
-      )}
+    
+      
+    
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
