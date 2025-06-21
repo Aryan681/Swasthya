@@ -3,7 +3,7 @@ import { FaHeartbeat, FaClinicMedical, FaLanguage, FaShieldAlt, FaUserMd, FaChar
 import medicalTeam from '../assets/medical-team.jpg';
 import appInterface from '../assets/app-interface.png';
 import haitiMap from '../assets/haiti-map.png';
-// import statsGraphic from '../assets/stats-graphic.png';
+import statsGraphic from '../assets/stats-graphic.jpg';
 
 export default function HomePage() {
   return (
@@ -219,11 +219,11 @@ export default function HomePage() {
               viewport={{ once: true }}
               transition={{ duration: 0.8 }}
             >
-              {/* <img 
+              <img 
                 src={statsGraphic} 
                 alt="Health impact statistics"
                 className="rounded-xl shadow-lg w-full"
-              /> */}
+              />
             </motion.div>
             
             <motion.div
