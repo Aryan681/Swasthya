@@ -30,7 +30,7 @@ export default function HomePage() {
               transition={{ delay: 0.2, duration: 0.8 }}
               className="text-5xl md:text-6xl lg:text-7xl font-bold text-white mb-6 leading-tight"
             >
-              <span className="text-blue-200">Advanced</span> Medical Triage <br />
+              <span className="text-blue-500">Advanced</span> Medical Triage <br />
               <span className="text-orange-300">for Haiti</span>
             </motion.h1>
             
