@@ -10,23 +10,13 @@ dotenv.config();
 
 const app = express();
 const port = process.env.PORT || 3001;
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://swasthya-eu1727lyj-aryans-projects-c3239cad.vercel.app'
-];
 
+
+// Middleware
 app.use(cors({
-  origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
+  origin: '*',  
 }));
   
-// Middleware
-
 app.use(express.json());
 
 // Routes
