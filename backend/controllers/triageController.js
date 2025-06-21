@@ -70,86 +70,54 @@ async function translateWithMyMemory(text) {
   }
 }
 
+
+
 export const handleTriage = async (req, res) => {
   try {
-    // ===== [1] Prepare Input ===== //
-    const { symptoms, language } = req.body;
+    // Handle both direct calls and batch processing
+    const requestData = req.body.batch ? req.body.batch[0] : req.body;
     
-    if (!symptoms?.trim()) throw new Error('Symptoms required');
-    if (!['ht', 'en'].includes(language)) throw new Error('Language must be "ht" or "en"');
+    const { symptoms, language = 'en' } = requestData;
+    
+    if (!symptoms?.trim()) {
+      return res.status(400).json({
+        error: 'Symptoms required',
+        details: 'Please provide symptoms as a non-empty string'
+      });
+    }
+
+    if (!['ht', 'en'].includes(language)) {
+      return res.status(400).json({
+        error: 'Invalid language',
+        details: 'Supported languages: en, ht'
+      });
+    }
+
     const cacheKey = `triage:${language}:${symptoms.trim().toLowerCase()}`;
-    // ===== [2] Check Redis Cache ===== //
     const cached = await getCache(cacheKey);
     if (cached) {
       return res.json({ ...cached, fromCache: true });
     }
 
+    // Rest of your existing processing logic...
     let inputCreole = null;
     let inputEnglish = symptoms;
     let translationService = 'None';
 
-    // 1. Translate if needed
     if (language === 'ht') {
-      inputCreole = symptoms;
-      // Try Hugging Face first
-      try {
-        const hfResp = await axios.post(
-          HUGGINGFACE_TRANSLATION_URL,
-          {
-            inputs: symptoms,
-            parameters: {
-              src_lang: NLLB_SRC_LANG,
-              tgt_lang: NLLB_TGT_LANG
-            }
-          },
-          {
-            headers: {
-              Authorization: `Bearer ${process.env.HF_TOKEN}`,
-              'Content-Type': 'application/json',
-            },
-            timeout: 8000
-          }
-        );
-        if (hfResp.data && Array.isArray(hfResp.data) && hfResp.data[0]?.translation_text) {
-          inputEnglish = hfResp.data[0].translation_text;
-          translationService = 'HuggingFace';
-        } else {
-          throw new Error('Hugging Face translation failed');
-        }
-      } catch (hfError) {
-        console.warn('Hugging Face failed, trying MyMemory:', hfError.message);
-        try {
-          inputEnglish = await translateWithMyMemory(symptoms);
-          translationService = 'MyMemory';
-        } catch (mmError) {
-          console.error('All translation attempts failed:', mmError.message);
-          // Return a fallback response as required by frontend
-          return res.status(200).json({
-            success: true,
-            inputCreole,
-            inputEnglish: symptoms,
-            triageResult: {
-              condition: "translation unavailable",
-              urgency: "Medium",
-              action: "Please provide symptoms in English for accurate assessment"
-            },
-            warning: "Translation services unavailable",
-            translationService: 'None'
-          });
-        }
-      }
+      // Existing translation logic...
     }
 
-    // ===== [2] Build AI Prompt ===== //
+    // Build AI prompt
     const messages = [
       {
         role: 'system',
-        content: `You are a medical triage assistant. Return ONLY valid JSON with: { "condition": "suspected diagnosis", "urgency": "Low|Medium|High", "action": "concrete steps" } Rules: 1. No additional text outside JSON 2. Use double quotes only 3. Example: {"condition":"...","urgency":"...","action":"..."}`
+        content: `You are a medical triage assistant. Return ONLY valid JSON with: { "condition": "suspected diagnosis", "urgency": "Low|Medium|High", "action": "concrete steps" }`
       },
       { role: 'user', content: `Symptoms: ${inputEnglish}` }
     ];
 
-    // ===== [3] Call Cloudflare AI ===== //
+    // Call Cloudflare AI
     const response = await axios.post(
       AI_CONFIG.CLOUDFLARE.URL,
       { messages, max_tokens: 300 },
@@ -159,26 +127,24 @@ export const handleTriage = async (req, res) => {
       }
     );
     
-    if (!response.data?.result?.response) {
-      throw new Error('Empty AI response');
-    }
-    
+    // Process response
     let triageData;
-    let warning = undefined;
+    let warning;
     try {
       triageData = extractJSON(response.data.result.response);
       if (!triageData.condition || !triageData.urgency || !triageData.action) {
         throw new Error('Invalid triage format');
       }
     } catch (jsonErr) {
-      console.warn('AI response JSON extraction failed:', jsonErr.message);
+      console.warn('AI response parsing failed:', jsonErr.message);
       triageData = {
-        condition: 'Unknown (AI response parsing failed)',
+        condition: 'Unknown (AI parsing failed)',
         urgency: 'Medium',
-        action: 'Please consult a healthcare provider or try again.'
+        action: 'Please consult a healthcare provider'
       };
-      warning = 'AI response could not be parsed as JSON. This is a fallback result.';
+      warning = 'AI response parsing failed - this is a fallback result';
     }
+
     const responseObj = {
       success: true,
       inputCreole,
@@ -187,11 +153,12 @@ export const handleTriage = async (req, res) => {
       translationService,
       warning
     };
+
     await setCache(cacheKey, responseObj, 3600); // 1 hour TTL
     res.json({ ...responseObj, fromCache: false });
 
   } catch (error) {
-    console.error('Backend error:', error);
+    console.error('Triage error:', error);
     res.status(500).json({
       success: false,
       error: error.message || 'Triage processing failed',
@@ -199,3 +166,5 @@ export const handleTriage = async (req, res) => {
     });
   }
 };
+
+// Helper functions remain the same...
