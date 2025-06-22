@@ -1,26 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { FaPhone, FaDirections, FaAmbulance, FaHospital, FaMapMarkerAlt, FaChevronDown, FaChevronUp } from 'react-icons/fa';
+import { FaPhone, FaDirections, FaAmbulance, FaHospital, FaMapMarkerAlt, FaChevronDown, FaChevronUp, FaInfoCircle } from 'react-icons/fa';
 
-// Custom hospital icon URL
 const HOSPITAL_ICON_URL = 'https://cdn-icons-png.flaticon.com/512/484/484167.png';
 
 export default function ClinicLocator() {
   const mapRef = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyHospitals, setNearbyHospitals] = useState([]);
-  const [radius, setRadius] = useState(15000); // in meters for Google Places API
+  const [radius, setRadius] = useState(15000); // in meters
   const [loading, setLoading] = useState(true);
   const [selectedHospital, setSelectedHospital] = useState(null);
   const [showHospitalList, setShowHospitalList] = useState(false);
   const [googleMapsLoaded, setGoogleMapsLoaded] = useState(false);
   const [service, setService] = useState(null);
+  const [detailedHospitals, setDetailedHospitals] = useState({});
 
   // Load Google Maps API
   useEffect(() => {
     if (!window.google) {
       const script = document.createElement('script');
       script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY}&libraries=places`;
-
       script.async = true;
       script.onload = () => {
         setGoogleMapsLoaded(true);
@@ -31,56 +30,109 @@ export default function ClinicLocator() {
       setGoogleMapsLoaded(true);
       setService(new window.google.maps.places.PlacesService(document.createElement('div')));
     }
-
-    return () => {
-      // Cleanup if needed
-    };
   }, []);
 
-  // Find nearby hospitals using Google Places API
+  // Fetch detailed information for a hospital
+  const fetchHospitalDetails = async (placeId) => {
+    if (!service || detailedHospitals[placeId]) return;
+    
+    return new Promise((resolve) => {
+      const request = {
+        placeId,
+        fields: [
+          'formatted_phone_number', 
+          'international_phone_number',
+          'website',
+          'opening_hours',
+          'name',
+          'address_components'
+        ]
+      };
+
+      service.getDetails(request, (place, status) => {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK) {
+          const details = {
+            phone: place.formatted_phone_number || place.international_phone_number,
+            website: place.website,
+            openingHours: place.opening_hours?.weekday_text || [],
+            isEmergency: checkIfEmergencyCenter(place)
+          };
+          
+          setDetailedHospitals(prev => ({
+            ...prev,
+            [placeId]: details
+          }));
+          resolve(details);
+        } else {
+          resolve(null);
+        }
+      });
+    });
+  };
+
+  // Check if the place is an emergency center
+  const checkIfEmergencyCenter = (place) => {
+    if (!place.address_components) return false;
+    return place.address_components.some(comp => 
+      comp.types.includes('hospital') || 
+      comp.types.includes('health') ||
+      place.name.toLowerCase().includes('emergency') ||
+      place.name.toLowerCase().includes('trauma')
+    );
+  };
+
+  // Find nearby hospitals
   const findNearbyHospitals = (location) => {
-    if (!service || !googleMapsLoaded) return;
+    if (!service) return;
 
     const request = {
       location: new window.google.maps.LatLng(location[0], location[1]),
       radius: radius,
       type: 'hospital',
-      keyword: 'hospital|clinic|medical center|pharmacy'
+      keyword: 'hospital|clinic|medical center|emergency|trauma|pharmacy'
     };
 
-    service.nearbySearch(request, (results, status) => {
+    service.nearbySearch(request, async (results, status) => {
       if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-        const hospitalsWithDetails = results.map(place => ({
-          id: place.place_id,
-          name: place.name,
-          address: place.vicinity,
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng(),
-          rating: place.rating,
-          distance: calculateDistance(
-            location[0],
-            location[1],
-            place.geometry.location.lat(),
-            place.geometry.location.lng()
-          )
-        }));
+        const hospitalsWithDetails = await Promise.all(
+          results.map(async (place) => {
+            const distance = calculateDistance(
+              location[0],
+              location[1],
+              place.geometry.location.lat(),
+              place.geometry.location.lng()
+            );
 
-        // Sort by distance
+            // Fetch basic details immediately
+            const basicDetails = {
+              id: place.place_id,
+              name: place.name,
+              address: place.vicinity,
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng(),
+              rating: place.rating,
+              distance,
+              types: place.types
+            };
+
+            // Start fetching detailed info in background
+            fetchHospitalDetails(place.place_id);
+
+            return basicDetails;
+          })
+        );
+
         const sortedHospitals = hospitalsWithDetails.sort((a, b) => a.distance - b.distance);
         setNearbyHospitals(sortedHospitals);
-        
-        // Add markers to map
         addMarkersToMap(sortedHospitals);
-      } else {
-        console.error('Google Places API error:', status);
       }
       setLoading(false);
     });
   };
 
-  // Calculate distance between two coordinates in km
+  // Calculate distance between coordinates
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Earth radius in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
@@ -91,7 +143,7 @@ export default function ClinicLocator() {
     return R * c;
   };
 
-  // Initialize map and markers
+  // Initialize map
   const initializeMap = (location) => {
     if (!window.google) return;
 
@@ -133,7 +185,7 @@ export default function ClinicLocator() {
     mapRef.current = map;
   };
 
-  // Add markers to the map
+  // Add markers to map
   const addMarkersToMap = (hospitals) => {
     if (!mapRef.current) return;
 
@@ -148,7 +200,6 @@ export default function ClinicLocator() {
         }
       });
 
-      // Add click event to show hospital details
       marker.addListener('click', () => {
         setSelectedHospital(hospital);
         if (window.innerWidth < 768) {
@@ -158,7 +209,7 @@ export default function ClinicLocator() {
     });
   };
 
-  // Get user location and initialize map
+  // Get user location and initialize
   useEffect(() => {
     if (!googleMapsLoaded) return;
 
@@ -172,9 +223,7 @@ export default function ClinicLocator() {
         },
         (err) => {
           console.error("Error getting location:", err);
-          setLoading(false);
-          // Fallback to default location if geolocation fails
-          const defaultLocation = [18.9712, -72.2852]; // Haiti center
+          const defaultLocation = [18.9712, -72.2852];
           setUserLocation(defaultLocation);
           initializeMap(defaultLocation);
           findNearbyHospitals(defaultLocation);
@@ -182,9 +231,7 @@ export default function ClinicLocator() {
         { enableHighAccuracy: true, timeout: 10000 }
       );
     } else {
-      setLoading(false);
-      // Fallback to default location if geolocation not supported
-      const defaultLocation = [18.9712, -72.2852]; // Haiti center
+      const defaultLocation = [18.9712, -72.2852];
       setUserLocation(defaultLocation);
       initializeMap(defaultLocation);
       findNearbyHospitals(defaultLocation);
@@ -197,41 +244,27 @@ export default function ClinicLocator() {
     window.open(url, '_blank');
   };
 
-  const getPlaceDetails = (placeId) => {
-    return new Promise((resolve) => {
-      if (!service) return resolve(null);
-      
-      const request = {
-        placeId: placeId,
-        fields: ['formatted_phone_number', 'opening_hours', 'website']
-      };
-
-      service.getDetails(request, (place, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK) {
-          resolve(place);
-        } else {
-          resolve(null);
-        }
-      });
-    });
-  };
+  // Fetch details when hospital is selected
+  useEffect(() => {
+    if (selectedHospital && !detailedHospitals[selectedHospital.id]) {
+      fetchHospitalDetails(selectedHospital.id);
+    }
+  }, [selectedHospital]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-6 px-4">
       <div className="max-w-6xl mx-auto">
-        {/* Mobile Header */}
+        {/* Header */}
         <div className="md:hidden mb-4">
           <h1 className="text-2xl font-bold text-blue-800">Medical Facilities Locator</h1>
           <p className="text-sm text-gray-600">Find hospitals near you</p>
         </div>
-
-        {/* Desktop Header */}
         <div className="hidden md:block mb-6">
           <h1 className="text-3xl font-bold text-blue-800 mb-2">Emergency Medical Facilities Locator</h1>
-          <p className="text-gray-600">Find hospitals within a {radius/1000}km radius of your location</p>
+          <p className="text-gray-600">Find hospitals within a {radius/1000}km radius</p>
         </div>
 
-        {/* Mobile Map Toggle */}
+        {/* Mobile Controls */}
         <div className="md:hidden mb-4 flex justify-between items-center">
           <div className="flex items-center">
             <label htmlFor="radius" className="mr-2 text-sm text-gray-600">Radius (km):</label>
@@ -405,38 +438,105 @@ export default function ClinicLocator() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mt-4">
+              {/* Contact Information */}
               <div className="bg-blue-50 p-3 rounded-lg">
-                <h3 className="font-semibold text-blue-800 text-sm md:text-base mb-1 md:mb-2">Location</h3>
-                <p className="text-xs md:text-sm text-gray-600">
-                  <FaMapMarkerAlt className="inline mr-1" />
-                  {selectedHospital.address}
-                </p>
-              </div>
-
-              <div className="bg-green-50 p-3 rounded-lg">
-                <h3 className="font-semibold text-green-800 text-sm md:text-base mb-1 md:mb-2">Details</h3>
-                <p className="text-xs md:text-sm text-gray-600">
-                  {selectedHospital.distance?.toFixed(1) || '--'} km away
-                </p>
-                {selectedHospital.rating && (
-                  <p className="text-xs md:text-sm text-gray-600 mt-1">
-                    Rating: ★ {selectedHospital.rating}
-                  </p>
+                <h3 className="font-semibold text-blue-800 text-sm md:text-base mb-1 md:mb-2 flex items-center">
+                  <FaPhone className="mr-2" /> Contact
+                </h3>
+                
+                {detailedHospitals[selectedHospital.id]?.phone ? (
+                  <div className="space-y-2">
+                    <div className="flex items-center">
+                      <span className="text-xs md:text-sm text-gray-600">Phone:</span>
+                      <a 
+                        href={`tel:${detailedHospitals[selectedHospital.id].phone}`} 
+                        className="ml-2 text-blue-600 hover:underline text-xs md:text-sm"
+                      >
+                        {detailedHospitals[selectedHospital.id].phone}
+                      </a>
+                    </div>
+                    
+                    {detailedHospitals[selectedHospital.id].isEmergency && (
+                      <div className="flex items-center">
+                        <FaAmbulance className="text-red-500 mr-2" />
+                        <span className="text-xs md:text-sm text-gray-600">
+                          Emergency services available
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs md:text-sm text-gray-500">
+                    <FaInfoCircle className="inline mr-1" />
+                    Phone number not available
+                  </div>
                 )}
               </div>
 
+              {/* Additional Details */}
+              <div className="bg-green-50 p-3 rounded-lg">
+                <h3 className="font-semibold text-green-800 text-sm md:text-base mb-1 md:mb-2">
+                  Details
+                </h3>
+                <div className="space-y-2">
+                  <p className="text-xs md:text-sm text-gray-600">
+                    Distance: {selectedHospital.distance?.toFixed(1) || '--'} km
+                  </p>
+                  {selectedHospital.rating && (
+                    <p className="text-xs md:text-sm text-gray-600">
+                      Rating: ★ {selectedHospital.rating}
+                    </p>
+                  )}
+                  {detailedHospitals[selectedHospital.id]?.website && (
+                    <a 
+                      href={detailedHospitals[selectedHospital.id].website} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline text-xs md:text-sm"
+                    >
+                      Visit Website
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
               <div className="bg-yellow-50 p-3 rounded-lg">
-                <h3 className="font-semibold text-yellow-800 text-sm md:text-base mb-1 md:mb-2">Actions</h3>
-                <div className="space-y-1 md:space-y-2">
+                <h3 className="font-semibold text-yellow-800 text-sm md:text-base mb-1 md:mb-2">
+                  Actions
+                </h3>
+                <div className="space-y-2">
+                  {detailedHospitals[selectedHospital.id]?.phone && (
+                    <a 
+                      href={`tel:${detailedHospitals[selectedHospital.id].phone}`}
+                      className="flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 text-xs md:text-sm"
+                    >
+                      <FaPhone className="mr-1 md:mr-2" /> Call Facility
+                    </a>
+                  )}
                   <button 
                     onClick={() => getDirections(selectedHospital)}
-                    className="w-full flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 text-xs md:text-sm"
+                    className="w-full flex items-center justify-center bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 text-xs md:text-sm"
                   >
                     <FaDirections className="mr-1 md:mr-2" /> Directions
                   </button>
                 </div>
               </div>
             </div>
+
+            {/* Opening Hours */}
+            {detailedHospitals[selectedHospital.id]?.openingHours?.length > 0 && (
+              <div className="mt-4 bg-gray-50 p-3 rounded-lg">
+                <h3 className="font-semibold text-gray-800 text-sm md:text-base mb-2">
+                  Opening Hours
+                </h3>
+                <ul className="text-xs md:text-sm space-y-1">
+                  {detailedHospitals[selectedHospital.id].openingHours.map((hour, index) => (
+                    <li key={index}>{hour}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         )}
       </div>
