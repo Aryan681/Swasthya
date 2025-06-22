@@ -1,9 +1,10 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { FaPhone, FaDirections, FaAmbulance, FaHospital, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaPhone, FaDirections, FaAmbulance, FaHospital, FaMapMarkerAlt, FaChevronDown, FaChevronUp } from 'react-icons/fa';
 
-// Extended hospital data with contact info and services
+// Hospital data remains the same as your original
 const hospitals = [
   {
     id: 101,
@@ -127,6 +128,7 @@ const hospitals = [
   }
 ];
 
+
 const haitiCenter = [18.9712, -72.2852];
 
 // Custom hospital icon
@@ -141,13 +143,14 @@ export default function ClinicLocator() {
   const mapRef = useRef(null);
   const [userLocation, setUserLocation] = useState(null);
   const [nearbyHospitals, setNearbyHospitals] = useState([]);
-  const [radius, setRadius] = useState(15); // 15km radius
+  const [radius, setRadius] = useState(15);
   const [loading, setLoading] = useState(true);
   const [selectedHospital, setSelectedHospital] = useState(null);
+  const [showHospitalList, setShowHospitalList] = useState(false); // Mobile toggle
 
-  // Calculate distance between two coordinates in km
+  // Calculate distance function remains the same
   const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Earth radius in km
+    const R = 6371;
     const dLat = (lat2 - lat1) * Math.PI / 180;
     const dLon = (lon2 - lon1) * Math.PI / 180;
     const a = 
@@ -158,26 +161,34 @@ export default function ClinicLocator() {
     return R * c;
   };
 
-  // Initialize map
+  // Initialize map - same logic but with mobile optimizations
   useEffect(() => {
     if (!mapRef.current) {
       mapRef.current = L.map('clinic-map', {
         center: haitiCenter,
-        zoom: 10,
-        zoomControl: true,
+        zoom: 8, // Slightly more zoomed out for mobile
+        zoomControl: false, // We'll add our own mobile-friendly controls
       });
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(mapRef.current);
 
-      // Add hospital markers
+      // Add mobile-friendly zoom controls
+      L.control.zoom({
+        position: 'bottomright'
+      }).addTo(mapRef.current);
+
       hospitals.forEach((hospital) => {
         L.marker([hospital.lat, hospital.lng], { icon: hospitalIcon })
           .addTo(mapRef.current)
           .bindPopup(`<b>${hospital.name}</b><br/>${hospital.address}`)
           .on('click', () => {
             setSelectedHospital(hospital);
+            // On mobile, show details when marker is clicked
+            if (window.innerWidth < 768) {
+              setShowHospitalList(true);
+            }
           });
       });
     }
@@ -192,7 +203,7 @@ export default function ClinicLocator() {
           
           // Add user location marker
           const userMarker = L.circleMarker(location, {
-            radius: 8,
+            radius: 6, // Smaller for mobile
             color: '#2563eb',
             fillColor: '#3b82f6',
             fillOpacity: 0.8,
@@ -204,10 +215,10 @@ export default function ClinicLocator() {
             color: '#3b82f6',
             fillColor: '#93c5fd',
             fillOpacity: 0.2,
-            radius: radius * 1000 // Convert km to meters
+            radius: radius * 1000
           }).addTo(mapRef.current);
 
-          // Calculate distances and filter hospitals
+          // Calculate distances
           const hospitalsWithDistance = hospitals.map(hospital => ({
             ...hospital,
             distance: calculateDistance(
@@ -250,48 +261,82 @@ export default function ClinicLocator() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-10 px-4">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-white py-6 px-4">
       <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-blue-800 mb-2">Emergency Medical Facilities Locator</h1>
-        <p className="text-gray-600 mb-6">Find hospitals within a 15km radius of your location</p>
+        {/* Mobile Header */}
+        <div className="md:hidden mb-4">
+          <h1 className="text-2xl font-bold text-blue-800">Medical Facilities Locator</h1>
+          <p className="text-sm text-gray-600">Find hospitals near you</p>
+        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Map Section */}
-          <div className="lg:col-span-2">
-            <div className="bg-white p-4 rounded-xl shadow-lg border border-gray-200">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-semibold text-blue-700">Interactive Map</h2>
-                <div className="flex items-center">
-                  <label htmlFor="radius" className="mr-2 text-sm text-gray-600">Radius:</label>
-                  <select 
-                    id="radius"
-                    value={radius}
-                    onChange={(e) => setRadius(Number(e.target.value))}
-                    className="border border-gray-300 rounded px-2 py-1 text-sm"
-                  >
-                    <option value="5">5 km</option>
-                    <option value="10">10 km</option>
-                    <option value="15">15 km</option>
-                    <option value="20">20 km</option>
-                  </select>
-                </div>
-              </div>
-              <div id="clinic-map" className="w-full h-[500px] rounded-lg overflow-hidden" />
-              <div className="mt-3 text-sm text-gray-500 flex items-center">
-                <div className="w-3 h-3 rounded-full bg-blue-500 mr-2"></div>
-                <span className="mr-4">Your Location</span>
-                <img src="https://cdn-icons-png.flaticon.com/512/484/484167.png" alt="Hospital" className="w-4 h-4 mr-2" />
+        {/* Desktop Header */}
+        <div className="hidden md:block mb-6">
+          <h1 className="text-3xl font-bold text-blue-800 mb-2">Emergency Medical Facilities Locator</h1>
+          <p className="text-gray-600">Find hospitals within a {radius}km radius of your location</p>
+        </div>
+
+        {/* Mobile Map Toggle */}
+        <div className="md:hidden mb-4 flex justify-between items-center">
+          <div className="flex items-center">
+            <label htmlFor="radius" className="mr-2 text-sm text-gray-600">Radius:</label>
+            <select 
+              id="radius"
+              value={radius}
+              onChange={(e) => setRadius(Number(e.target.value))}
+              className="border border-gray-300 rounded px-2 py-1 text-sm"
+            >
+              <option value="5">5 km</option>
+              <option value="10">10 km</option>
+              <option value="15">15 km</option>
+              <option value="20">20 km</option>
+            </select>
+          </div>
+          <button 
+            onClick={() => setShowHospitalList(!showHospitalList)}
+            className="flex items-center text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded"
+          >
+            {showHospitalList ? 'Show Map' : 'Show List'}
+            {showHospitalList ? <FaChevronDown className="ml-1" /> : <FaChevronUp className="ml-1" />}
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-8">
+          {/* Map Section - Hidden on mobile when list is shown */}
+          <div className={`${showHospitalList ? 'hidden md:block' : ''} md:col-span-2`}>
+            <div className="bg-white p-3 md:p-4 rounded-xl shadow-lg border border-gray-200">
+              <h2 className="hidden md:block text-xl font-semibold text-blue-700 mb-4">Interactive Map</h2>
+              <div id="clinic-map" className="w-full h-[300px] md:h-[500px] rounded-lg overflow-hidden" />
+              <div className="mt-2 text-xs md:text-sm text-gray-500 flex items-center">
+                <div className="w-2 h-2 md:w-3 md:h-3 rounded-full bg-blue-500 mr-1 md:mr-2"></div>
+                <span className="mr-2 md:mr-4">Your Location</span>
+                <img src="https://cdn-icons-png.flaticon.com/512/484/484167.png" alt="Hospital" className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
                 <span>Medical Facilities</span>
               </div>
             </div>
           </div>
 
-          {/* Hospitals List */}
-          <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-            <h2 className="text-xl font-semibold text-blue-700 mb-4 flex items-center">
-              <FaHospital className="mr-2 text-blue-500" />
-              Nearby Medical Facilities ({nearbyHospitals.length})
-            </h2>
+          {/* Hospitals List - Always shown on desktop, toggleable on mobile */}
+          <div className={`${!showHospitalList ? 'hidden md:block' : ''} bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-200`}>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg md:text-xl font-semibold text-blue-700 flex items-center">
+                <FaHospital className="mr-2 text-blue-500" />
+                Nearby ({nearbyHospitals.length})
+              </h2>
+              <div className="hidden md:block">
+                <label htmlFor="radius-desktop" className="mr-2 text-sm text-gray-600">Radius:</label>
+                <select 
+                  id="radius-desktop"
+                  value={radius}
+                  onChange={(e) => setRadius(Number(e.target.value))}
+                  className="border border-gray-300 rounded px-2 py-1 text-sm"
+                >
+                  <option value="5">5 km</option>
+                  <option value="10">10 km</option>
+                  <option value="15">15 km</option>
+                  <option value="20">20 km</option>
+                </select>
+              </div>
+            </div>
 
             {loading ? (
               <div className="flex justify-center items-center h-40">
@@ -299,134 +344,171 @@ export default function ClinicLocator() {
               </div>
             ) : userLocation ? (
               nearbyHospitals.length > 0 ? (
-                <div className="space-y-4">
+                <div className="space-y-3 md:space-y-4 max-h-[400px] overflow-y-auto">
                   {nearbyHospitals.map(hospital => (
                     <div 
                       key={hospital.id} 
-                      className={`p-4 rounded-lg border ${selectedHospital?.id === hospital.id ? 'border-blue-500 bg-blue-50' : 'border-gray-200'}`}
+                      className={`p-3 md:p-4 rounded-lg border cursor-pointer ${
+                        selectedHospital?.id === hospital.id ? 
+                        'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                      }`}
                       onClick={() => setSelectedHospital(hospital)}
                     >
-                      <h3 className="font-bold text-blue-800">{hospital.name}</h3>
-                      <div className="flex items-center text-sm text-gray-600 mt-1">
+                      <h3 className="font-bold text-sm md:text-base text-blue-800">{hospital.name}</h3>
+                      <div className="flex items-center text-xs md:text-sm text-gray-600 mt-1">
                         <FaMapMarkerAlt className="mr-1" />
                         <span>{hospital.distance.toFixed(1)} km away</span>
                       </div>
-                      <div className="mt-2 text-sm">
+                      <div className="mt-2 text-xs md:text-sm">
                         <div className="flex items-center">
-                          <FaPhone className="text-blue-500 mr-2" />
+                          <FaPhone className="text-blue-500 mr-1 md:mr-2" />
                           <a href={`tel:${hospital.phone}`} className="text-blue-600 hover:underline">
                             {hospital.phone}
                           </a>
                         </div>
-                        <div className="flex items-center mt-1">
-                          <FaAmbulance className="text-red-500 mr-2" />
-                          <span className="text-red-600">{hospital.ambulance}</span>
-                        </div>
+                        {hospital.ambulance && (
+                          <div className="flex items-center mt-1">
+                            <FaAmbulance className="text-red-500 mr-1 md:mr-2" />
+                            <a href={`tel:${hospital.ambulance}`} className="text-red-600 hover:underline">
+                              {hospital.ambulance}
+                            </a>
+                          </div>
+                        )}
                       </div>
-                      <div className="mt-3">
+                      <div className="mt-2">
                         <button 
-                          onClick={() => getDirections(hospital)}
-                          className="flex items-center text-sm bg-blue-100 text-blue-700 px-3 py-1 rounded hover:bg-blue-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            getDirections(hospital);
+                          }}
+                          className="flex items-center text-xs md:text-sm bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
                         >
-                          <FaDirections className="mr-1" /> Get Directions
+                          <FaDirections className="mr-1" /> Directions
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
               ) : (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-gray-500 text-sm md:text-base">
                   No hospitals found within {radius} km radius.
                 </div>
               )
             ) : (
-              <div className="text-center py-8 text-gray-500">
+              <div className="text-center py-8 text-gray-500 text-sm md:text-base">
                 Please enable location services to see nearby hospitals.
               </div>
             )}
 
-            {/* Emergency Contacts */}
-            <div className="mt-8">
-              <h3 className="font-semibold text-red-700 mb-2">Emergency Contacts</h3>
-              <div className="bg-red-50 p-3 rounded-lg border border-red-100">
+            {/* Emergency Contacts - Mobile compact */}
+            <div className="mt-6">
+              <h3 className="font-semibold text-red-700 text-sm md:text-base mb-2">Emergency Contacts</h3>
+              <div className="bg-red-50 p-2 md:p-3 rounded-lg border border-red-100 text-xs md:text-sm">
                 <div className="flex items-center mb-1">
-                  <FaAmbulance className="text-red-500 mr-2" />
+                  <FaAmbulance className="text-red-500 mr-1 md:mr-2" />
                   <span className="font-medium">National Ambulance:</span>
-                  <a href="tel:116" className="ml-2 text-red-600">116</a>
+                  <a href="tel:116" className="ml-1 md:ml-2 text-red-600">116</a>
                 </div>
                 <div className="flex items-center">
-                  <FaPhone className="text-red-500 mr-2" />
+                  <FaPhone className="text-red-500 mr-1 md:mr-2" />
                   <span className="font-medium">Emergency Police:</span>
-                  <a href="tel:114" className="ml-2 text-red-600">114</a>
+                  <a href="tel:114" className="ml-1 md:ml-2 text-red-600">114</a>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Selected Hospital Details */}
+        {/* Selected Hospital Details - Mobile drawer */}
         {selectedHospital && (
-          <div className="mt-8 bg-white p-6 rounded-xl shadow-lg border border-gray-200">
-            <div className="flex justify-between items-start">
+          <div className={`${window.innerWidth < 768 ? 'fixed inset-x-0 bottom-0 bg-white p-4 rounded-t-xl shadow-2xl border-t border-gray-200 z-50' : 'mt-6 bg-white p-4 md:p-6 rounded-xl shadow-lg border border-gray-200'}`}>
+            {window.innerWidth < 768 && (
+              <div className="flex justify-between items-center mb-3">
+                <h2 className="text-lg font-bold text-blue-800">{selectedHospital.name}</h2>
+                <button 
+                  onClick={() => setSelectedHospital(null)}
+                  className="text-gray-500"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+            
+            <div className="md:flex md:justify-between md:items-start">
               <div>
-                <h2 className="text-2xl font-bold text-blue-800">{selectedHospital.name}</h2>
-                <p className="text-gray-600 mt-1">
+                <h2 className="hidden md:block text-xl md:text-2xl font-bold text-blue-800">{selectedHospital.name}</h2>
+                <p className="text-gray-600 text-xs md:text-sm mt-1">
                   <FaMapMarkerAlt className="inline mr-1" />
                   {selectedHospital.address} • {selectedHospital.distance?.toFixed(1) || '--'} km away
                 </p>
               </div>
               <button 
                 onClick={() => getDirections(selectedHospital)}
-                className="flex items-center bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                className="w-full md:w-auto flex items-center justify-center bg-blue-600 text-white px-3 py-2 rounded-lg hover:bg-blue-700 mt-2 md:mt-0 text-sm md:text-base"
               >
                 <FaDirections className="mr-2" /> Directions
               </button>
             </div>
 
-            <div className="grid md:grid-cols-3 gap-6 mt-6">
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-blue-800 mb-2">Contact Information</h3>
-                <ul className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4 mt-4">
+              <div className="bg-blue-50 p-3 rounded-lg">
+                <h3 className="font-semibold text-blue-800 text-sm md:text-base mb-1 md:mb-2">Contact</h3>
+                <ul className="space-y-1 md:space-y-2 text-xs md:text-sm">
                   <li className="flex items-center">
-                    <FaPhone className="text-blue-500 mr-2" />
+                    <FaPhone className="text-blue-500 mr-1 md:mr-2" />
                     <a href={`tel:${selectedHospital.phone}`} className="text-blue-600 hover:underline">
                       {selectedHospital.phone}
                     </a>
                   </li>
-                  <li className="flex items-center">
-                    <FaAmbulance className="text-red-500 mr-2" />
-                    <span>Ambulance: {selectedHospital.ambulance}</span>
-                  </li>
+                  {selectedHospital.ambulance && (
+                    <li className="flex items-center">
+                      <FaAmbulance className="text-red-500 mr-1 md:mr-2" />
+                      <a href={`tel:${selectedHospital.ambulance}`} className="text-red-600 hover:underline">
+                        Ambulance: {selectedHospital.ambulance}
+                      </a>
+                    </li>
+                  )}
                 </ul>
               </div>
 
-              <div className="bg-green-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-green-800 mb-2">Available Services</h3>
-                <ul className="space-y-1">
-                  {selectedHospital.services.map((service, index) => (
+              <div className="bg-green-50 p-3 rounded-lg">
+                <h3 className="font-semibold text-green-800 text-sm md:text-base mb-1 md:mb-2">Services</h3>
+                <ul className="space-y-1 text-xs md:text-sm">
+                  {selectedHospital.services.slice(0, 3).map((service, index) => (
                     <li key={index} className="flex items-center">
-                      <span className="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                      <span className="w-1.5 h-1.5 md:w-2 md:h-2 bg-green-500 rounded-full mr-1 md:mr-2"></span>
                       {service}
                     </li>
                   ))}
+                  {selectedHospital.services.length > 3 && (
+                    <li className="text-gray-500 text-xs">+{selectedHospital.services.length - 3} more</li>
+                  )}
                 </ul>
               </div>
 
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <h3 className="font-semibold text-yellow-800 mb-2">Quick Actions</h3>
-                <div className="space-y-2">
-                  <button className="w-full flex items-center justify-center bg-blue-100 text-blue-700 px-3 py-2 rounded hover:bg-blue-200">
-                    <FaPhone className="mr-2" /> Call Hospital
-                  </button>
+              <div className="bg-yellow-50 p-3 rounded-lg">
+                <h3 className="font-semibold text-yellow-800 text-sm md:text-base mb-1 md:mb-2">Actions</h3>
+                <div className="space-y-1 md:space-y-2">
+                  <a 
+                    href={`tel:${selectedHospital.phone}`}
+                    className="block w-full text-center flex items-center justify-center bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200 text-xs md:text-sm"
+                  >
+                    <FaPhone className="mr-1 md:mr-2" /> Call
+                  </a>
                   <button 
                     onClick={() => getDirections(selectedHospital)}
-                    className="w-full flex items-center justify-center bg-green-100 text-green-700 px-3 py-2 rounded hover:bg-green-200"
+                    className="w-full flex items-center justify-center bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200 text-xs md:text-sm"
                   >
-                    <FaDirections className="mr-2" /> Get Directions
+                    <FaDirections className="mr-1 md:mr-2" /> Directions
                   </button>
-                  <button className="w-full flex items-center justify-center bg-red-100 text-red-700 px-3 py-2 rounded hover:bg-red-200">
-                    <FaAmbulance className="mr-2" /> Call Ambulance
-                  </button>
+                  {selectedHospital.ambulance && (
+                    <a 
+                      href={`tel:${selectedHospital.ambulance}`}
+                      className="block w-full text-center flex items-center justify-center bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200 text-xs md:text-sm"
+                    >
+                      <FaAmbulance className="mr-1 md:mr-2" /> Ambulance
+                    </a>
+                  )}
                 </div>
               </div>
             </div>
